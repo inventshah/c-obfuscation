@@ -12,11 +12,6 @@ void foo(int *a, int *b)
 
 int thing();
 
-int thing()
-{
-	return 3;
-}
-
 /*
 	LONG BLOCK
 	!@#$%^&*() sjdflkjasdlf
@@ -35,4 +30,9 @@ int main(void) {
 	printf("(%d, %d)\n", a, b);
 
 	return 0;
+}
+
+int thing()
+{
+	return 3;
 }

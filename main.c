@@ -21,12 +21,6 @@ int main(int argc, char **argv)
 	asm_function_t *fnct = parse_asm(file);
 
 	instruction_t *i = fnct->instructions;
-
-	// while (fnct != NULL)
-	// {
-	// 	printf("hex: \"%s\"\n", asm_to_hex(fnct));
-	// 	fnct = fnct->next;
-	// }
 	
 	char *ifp = open_c("test.c");
 	clear_comments(ifp);

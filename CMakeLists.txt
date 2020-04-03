@@ -19,6 +19,7 @@ add_library(${PROJECT_NAME} SHARED
 	${PROJECT_SOURCE_DIR}/src/utils.c
 	${PROJECT_SOURCE_DIR}/src/parser.c
 	${PROJECT_SOURCE_DIR}/src/writer.c
+	${PROJECT_SOURCE_DIR}/src/regex_helper.c
 )
 
 target_link_libraries(${PROJECT_NAME} m)

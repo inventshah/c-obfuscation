@@ -4,6 +4,7 @@
 #include "writer.h"
 #include "parser.h"
 #include "utils.h"
+#include "regex_helper.h"
 
 #include <ctype.h>
 
@@ -14,12 +15,16 @@
 
 #include <regex.h>
 
+// Regex to get functions
 const char *function_regex = "(([a-zA-Z0-9_ \t\n]|\\[|\\])+[ \t\n*]*[ \t\n]+[*]*)([a-zA-Z0-9_]+)[ \t\n]*\\((([a-zA-Z0-9_ \t\n.,*]|\\[|\\])*)\\)[ \t\n]*{"; //"([a-zA-Z0-9_ \t\n\\[\\]]+[ \t\n*]*[ \t\n]+[*]*)([a-zA-Z0-9_]+)[ \t\n]*\\(([* \t\na-zA-Z0-9_,.\\[\\]]*)\\)[ \t\n]*{";
 const char *declaration_regex = "(([a-zA-Z0-9_ \t\n]|\\[|\\])+[ \t\n*]*[ \t\n]+[*]*)([a-zA-Z0-9_]+)[ \t\n]*\\((([a-zA-Z0-9_ \t\n.,*]|\\[|\\])*)\\)[ \t\n]*;";
 const char *type_regex = "([a-zA-Z0-9_ \t\n]+[ \t\n*]*[ \t\n]+[*]*)([a-zA-Z0-9_]+|\\[|\\])+";
+
+// Regex to clear comments
 const char *inline_regex = "\\/\\/[^\n]*\n";
 const char *block_regex = "\\/\\*.*?\\*\\/";
 
+// Remove trailing whitespace
 void chomp(char *str)
 {
 	int i = strlen(str) - 1;
@@ -27,6 +32,7 @@ void chomp(char *str)
 	while (isspace(str[i]) && i >= 0) str[i--] = '\0';
 }
 
+// Remove leading whitespace
 void strip(char *str)
 {
 	int i = 0, j = 0, length = strlen(str);
@@ -36,12 +42,14 @@ void strip(char *str)
 	while (i <= length) str[j++] = str[i++];
 }
 
+// Remove trailing and leading whitespace
 void trim(char *str)
 {
 	chomp(str);
 	strip(str);
 }
 
+// Convert an asm functions to a hex string like "\xc3"
 char *asm_to_hex(asm_function_t *function)
 {
 	int i = 0;
@@ -59,6 +67,7 @@ char *asm_to_hex(asm_function_t *function)
 	return string;
 }
 
+// Return a substring from start to end
 char *get_substring(char *str, uint32_t start, uint32_t end)
 {
 	char *substr = (char *) calloc(sizeof(char), end - start + 1);
@@ -71,16 +80,7 @@ char *get_substring(char *str, uint32_t start, uint32_t end)
 	return substr;
 }
 
-int8_t match(regex_t *re, regmatch_t *groups, size_t n_groups, char *str)
-{
-	int ret = regexec(re, str, n_groups, groups, 0);
-
-	if (!ret) return 1;
-	else if (ret == REG_NOMATCH) return 0;
-	else regerror(ret, re, str, sizeof(str));
-	return -1;
-}
-
+// Convert a function parameter list in form (type name, ...) to (type, ...)
 char *get_param_types(char *params, regex_t *re, regmatch_t *groups, size_t n_groups)
 {
 	size_t length = strlen(params);
@@ -113,37 +113,38 @@ char *get_param_types(char *params, regex_t *re, regmatch_t *groups, size_t n_gr
 	return type_list;
 }
 
-
+// Remove all comments from input
 void clear_comments(char *input)
 {
 	regex_t re_inline, re_block;
-	regmatch_t groups[1];
-	int compile_code, block_match, input_match;
+	regmatch_t groups[1], inline_groups[1], block_groups[1];
+	int compile_code; 
+	uint8_t block_match, input_match;
 	size_t n_groups;
 	char *start = input, clear = '\n';
 
-	compile_code = regcomp(&re_inline, inline_regex, REG_EXTENDED | REG_ENHANCED);
-	if (compile_code) printf("Could not compile regex: %d\n", compile_code);
+	compile_regex(&re_inline, inline_regex);
+	compile_regex(&re_block, block_regex);
 
-	compile_code = regcomp(&re_block, block_regex, REG_EXTENDED | REG_ENHANCED);
-	if (compile_code) printf("Could not compile regex: %d\n", compile_code);
-
-	while(match(&re_inline, groups, 1, input) == 1 && *input != '\0')
+	while(*input != '\0')
 	{
-		memset(input + groups[0].rm_so, clear, groups[0].rm_eo - groups[0].rm_so);
-		input += groups[0].rm_eo;
-	}
+		input_match = match(&re_inline, inline_groups, 1, input);
+		block_match = match(&re_block, block_groups, 1, input);
 
-	input = start;
-	while(match(&re_block, groups, 1, input) == 1 && *input != '\0')
-	{
+		if (input_match == 1 && block_match == 1) groups[0] = block_groups[0].rm_so < inline_groups[0].rm_so ? block_groups[0] : inline_groups[0];
+		else if (input_match == 1 && block_match != 1) groups[0] = inline_groups[0];
+		else if (input_match != 1 && block_match == 1) groups[0] = block_groups[0];
+		else break;
+
 		memset(input + groups[0].rm_so, clear, groups[0].rm_eo - groups[0].rm_so);
 		input += groups[0].rm_eo;
 	}
 
 	regfree(&re_inline);
+	regfree(&re_block);
 }
 
+// Print regular code without newlines and tabs unless required
 void print_plain(char *input, FILE *output, uint32_t num)
 {
 	uint32_t i = 0;
@@ -169,6 +170,7 @@ void print_plain(char *input, FILE *output, uint32_t num)
 
 }
 
+// Write a c file based on asm functions
 void write_c(char *input, FILE *output, asm_function_t *functions)
 {
 	char buffer[BUFFER_SIZE], current_char;
@@ -179,38 +181,36 @@ void write_c(char *input, FILE *output, asm_function_t *functions)
 	int compile_code, bracket_count;
 	size_t n_groups_function, n_groups_type;
 
-	compile_code = regcomp(&re_function, function_regex, REG_EXTENDED | REG_ENHANCED);
-	if (compile_code) printf("Could not compile regex: %d\n", compile_code);
-
-	compile_code = regcomp(&re_type, type_regex, REG_EXTENDED | REG_ENHANCED);
-	if (compile_code) printf("Could not compile regex: %d\n", compile_code);
-
-	compile_code = regcomp(&re_declaration, declaration_regex, REG_EXTENDED | REG_ENHANCED);
-	if (compile_code) printf("Could not compile regex: %d\n", compile_code);
+	// Init regex vars
+	compile_regex(&re_function, function_regex);
+	compile_regex(&re_type, type_regex);
+	compile_regex(&re_declaration, declaration_regex);
 
 	n_groups_function = re_function.re_nsub + 1;
 	n_groups_type = re_type.re_nsub + 1;
 
-	function_groups = (regmatch_t *) calloc(sizeof(regmatch_t), n_groups_function);
-	check_null(function_groups, "calloc failed to find space for match groups.");
+	function_groups = allocate_groups(n_groups_function);
+	type_groups = allocate_groups(n_groups_type);
+	declaration_groups = allocate_groups(n_groups_function);
 
-	type_groups = (regmatch_t *) calloc(sizeof(regmatch_t), n_groups_type);
-	check_null(type_groups, "calloc failed to find space for match groups.");
-
-	declaration_groups = (regmatch_t *) calloc(sizeof(regmatch_t), n_groups_function);
-	check_null(declaration_groups, "calloc failed to find space for match groups.");
-
+	// Get the next function
 	while (match(&re_function, function_groups, n_groups_function, input) == 1 && functions != NULL)
 	{
+		// If there is a declaration before the function, print it with the new type
 		if (match(&re_declaration, declaration_groups, n_groups_function, input) == 1 && function_groups[0].rm_so > declaration_groups[0].rm_so)
 		{
-			return_type = get_substring(input, function_groups[1].rm_so, function_groups[1].rm_eo);
-			function_name = get_substring(input, function_groups[3].rm_so, function_groups[3].rm_eo);
-			parameters = get_substring(input, function_groups[4].rm_so, function_groups[4].rm_eo);
+			print_plain(input, output, declaration_groups[0].rm_so);
+			return_type = get_substring(input, declaration_groups[1].rm_so, declaration_groups[1].rm_eo);
+			function_name = get_substring(input, declaration_groups[3].rm_so, declaration_groups[3].rm_eo);
+			parameters = get_substring(input, declaration_groups[4].rm_so, declaration_groups[4].rm_eo);
 			parameter_types = get_param_types(parameters, &re_type, type_groups, n_groups_type);
 			fprintf(output, "%s(*%s)(%s);", return_type, function_name, parameter_types);
 
 			input += declaration_groups[0].rm_eo;
+			free(return_type);
+			free(function_name);
+			free(parameters);
+			free(parameter_types);
 			continue;
 		}
 		else
@@ -218,11 +218,13 @@ void write_c(char *input, FILE *output, asm_function_t *functions)
 			print_plain(input, output, function_groups[0].rm_so);
 		}
 
+		// Get function parts
 		return_type = get_substring(input, function_groups[1].rm_so, function_groups[1].rm_eo);
 		function_name = get_substring(input, function_groups[3].rm_so, function_groups[3].rm_eo);
 		parameters = get_substring(input, function_groups[4].rm_so, function_groups[4].rm_eo);
 		parameter_types = get_param_types(parameters, &re_type, type_groups, n_groups_type);
 
+		// If its not the main function, convert to asm
 		if (strcmp(function_name, "main") != 0)
 		{
 			input += function_groups[0].rm_eo;
@@ -241,8 +243,6 @@ void write_c(char *input, FILE *output, asm_function_t *functions)
 
 			fprintf(output, "\"%s\";", hex);
 			free(hex);
-
-			functions = functions->next;
 		}
 		else
 		{
@@ -250,6 +250,8 @@ void write_c(char *input, FILE *output, asm_function_t *functions)
 			print_plain(input, output, function_groups[0].rm_eo - function_groups[0].rm_so);
 			input += function_groups[0].rm_eo - function_groups[0].rm_so;
 		}
+
+		functions = functions->next;
 
 		free(return_type);
 		free(function_name);
