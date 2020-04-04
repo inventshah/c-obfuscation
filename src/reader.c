@@ -60,7 +60,7 @@ char *open_c(char *filename)
 	file = (char *) calloc(sizeof(char), size + 1);
 
 	fread(file, sizeof(char), size, fp);
-	close(fp);
+	fclose(fp);
 
 	return file;
 }

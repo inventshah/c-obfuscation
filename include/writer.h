@@ -24,7 +24,7 @@ char *get_substring(char *str, uint32_t start, uint32_t end);
 char *get_param_types(char *params, regex_t *re, regmatch_t *groups, size_t n_groups);
 void clear_comments(char *input);
 
-void print_plain(char *input, FILE *output, uint32_t num);
+void print_plain(char *input, FILE *output, uint32_t num, regmatch_t *groups);
 
 void write_c(char *input, FILE *output, asm_function_t *functions);
 

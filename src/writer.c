@@ -145,12 +145,12 @@ void clear_comments(char *input)
 }
 
 // Print regular code without newlines and tabs unless required
-void print_plain(char *input, FILE *output, uint32_t num)
+void print_plain(char *input, FILE *output, uint32_t num, regmatch_t *groups)
 {
-	uint32_t i = 0;
+	uint32_t i = 0, j = 0;
 	uint8_t hashtag = 0;
 
-	while (i < num)
+	while (i < num || hashtag == 1)
 	{
 		// #define and #input lines
 		if (input[i] == '#') hashtag = 1;
@@ -166,8 +166,10 @@ void print_plain(char *input, FILE *output, uint32_t num)
 		i++;
 	}
 
-	if (hashtag == 1) fprintf(output, "\n");
-
+	if (i > num && groups != NULL)
+	{
+		for (j = 0; j < 2; j++) groups[j].rm_so = i;
+	}
 }
 
 // Write a c file based on asm functions
@@ -178,8 +180,9 @@ void write_c(char *input, FILE *output, asm_function_t *functions)
 
 	regex_t re_function, re_type, re_declaration;
 	regmatch_t *function_groups, *type_groups, *declaration_groups;
-	int compile_code, bracket_count;
+	int compile_code;
 	size_t n_groups_function, n_groups_type;
+	uint32_t bracket_count, new_index;
 
 	// Init regex vars
 	compile_regex(&re_function, function_regex);
@@ -199,7 +202,7 @@ void write_c(char *input, FILE *output, asm_function_t *functions)
 		// If there is a declaration before the function, print it with the new type
 		if (match(&re_declaration, declaration_groups, n_groups_function, input) == 1 && function_groups[0].rm_so > declaration_groups[0].rm_so)
 		{
-			print_plain(input, output, declaration_groups[0].rm_so);
+			print_plain(input, output, declaration_groups[0].rm_so, declaration_groups);
 			return_type = get_substring(input, declaration_groups[1].rm_so, declaration_groups[1].rm_eo);
 			function_name = get_substring(input, declaration_groups[3].rm_so, declaration_groups[3].rm_eo);
 			parameters = get_substring(input, declaration_groups[4].rm_so, declaration_groups[4].rm_eo);
@@ -215,7 +218,7 @@ void write_c(char *input, FILE *output, asm_function_t *functions)
 		}
 		else
 		{
-			print_plain(input, output, function_groups[0].rm_so);
+			print_plain(input, output, function_groups[0].rm_so, function_groups);
 		}
 
 		// Get function parts
@@ -247,7 +250,7 @@ void write_c(char *input, FILE *output, asm_function_t *functions)
 		else
 		{
 			input += function_groups[0].rm_so;
-			print_plain(input, output, function_groups[0].rm_eo - function_groups[0].rm_so);
+			print_plain(input, output, function_groups[0].rm_eo - function_groups[0].rm_so, function_groups);
 			input += function_groups[0].rm_eo - function_groups[0].rm_so;
 		}
 
@@ -259,7 +262,7 @@ void write_c(char *input, FILE *output, asm_function_t *functions)
 		free(parameter_types);
 	}
 
-	print_plain(input, output, strlen(input));
+	print_plain(input, output, strlen(input), NULL);
 
 	regfree(&re_function);
 	regfree(&re_type);

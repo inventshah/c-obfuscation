@@ -34,5 +34,11 @@ int main(void) {
 
 int thing()
 {
-	return 3;
+	int w = 0;
+	for (int k = 0; k < 10; k++)
+	{
+		w += k;
+		w /= 2;
+	}
+	return w;
 }
