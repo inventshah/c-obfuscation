@@ -1,22 +1,24 @@
-# K-means image segmentation
-Implementation of k-means image segmentation in C.
+# C Obfuscation
+Convert pure functions to binary functional pointers in C files.
 
 ### How to Use
-Dependencies: `png.h`
+Dependencies: `regex.h`
 
-Clone: `git clone https://github.com/inventshah/Kmeans-C.git`
+Clone: `git clone https://github.com/inventshah/c-obfuscation.git`
 
 Compile: `./build.sh`
 
-Run: `./bin/main [source filename] [output filename] [K-value] [max generations]`
+Run: `./bin/main [c source filename]]`
 
-Default max generations is 100.
+Options:
 
-### Examples
+* `-o [output file name]` Saves the obfuscated c file to that location, default is `out.c`
+* `-b [binary]` uses the binary file instead of compiling a new one.
 
-source | 2 | 3 | 4 | 5
-:-----:|:-:|:-:|:-:|:-:
-![source](images/source.png) | ![2](images/k2.png) | ![3](images/k3.png) | ![4](images/k4.png) | ![5](images/k5.png)
+Functions will be converted to their binary counter parts and can be executed as functional pointers.
+
+Run `bash test-all.sh` to check the test cases.
 
 ### Built With
 * C
+* Regex

@@ -5,7 +5,7 @@
 
 # Init Vars
 PASS=0
-NUM_CASES=10
+NUM_CASES=9
 
 
 # Run test cases

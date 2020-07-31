@@ -14,6 +14,8 @@ uint8_t get_next_byte(FILE *file);
 
 int move_to_next_asm(FILE *file);
 
+int move_to_first_asm(FILE *file);
+
 char *open_c(char *filename);
 
 #endif

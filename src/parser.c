@@ -36,9 +36,11 @@ asm_function_t *parse_asm(FILE* bin)
 {
 	asm_function_t *root = NULL, *function = NULL;
 	instruction_t *instruction = NULL;
-	uint8_t byte = 0;
+	uint8_t byte = 0, flag = 1;
 
-	while (move_to_next_asm(bin))
+	move_to_first_asm(bin);
+
+	while (flag)
 	{
 		if (root == NULL)
 		{
@@ -56,9 +58,12 @@ asm_function_t *parse_asm(FILE* bin)
 		do
 		{
 			byte = get_next_byte(bin);
+
 			instruction = create_instruction(byte, instruction);
 			function->size++;
 		} while (feof(bin) == 0 && byte != ASM_END);
+
+		flag = move_to_next_asm(bin);
 	}
 
 	return root;
